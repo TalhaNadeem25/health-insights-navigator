@@ -1,18 +1,81 @@
-# Welcome to your Lovable project
+# Health Insights Navigator
 
-## Project info
-
-**URL**: https://lovable.dev/projects/fcb93237-a2d8-4b75-8b9e-c85054bdd080
+A comprehensive health data analysis and visualization platform.
 
 ## Environment Variables
 
 This project uses environment variables for configuration. Create a `.env` file in the root directory with the following variables:
 
 ```
+# API Configuration
+VITE_API_BASE_URL=https://data.healthcare.gov/api/1
+
+# Development Mode (set to false to use real data)
+VITE_USE_REAL_DATA=false
+
+# Gemini API Key (for health analysis)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
+### Configuration Options
+
+- `VITE_API_BASE_URL`: The base URL for the healthcare data API
+- `VITE_USE_REAL_DATA`: Set to `false` to use real data from the API, `true` to use mock data
+- `VITE_GEMINI_API_KEY`: Your Google Gemini API key for health analysis features
+
 You can get a Gemini API key from [Google AI Studio](https://ai.google.dev/).
+
+## Data Sources
+
+The application can work with both real and mock data:
+
+1. **Real Data Mode** (`VITE_USE_REAL_DATA=false`):
+   - Fetches data from the healthcare API
+   - Requires proper API endpoint configuration
+   - Includes fallback to mock data if API is unavailable
+
+2. **Mock Data Mode** (`VITE_USE_REAL_DATA=true`):
+   - Uses predefined mock data for development
+   - Useful for testing and development
+   - No API connection required
+
+## Development Setup
+
+1. Clone the repository
+2. Copy `.env.example` to `.env` and configure your environment variables
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Technologies Used
+
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+- Google Gemini AI
+- React Query
+- Recharts
+- Leaflet
+
+## Features
+
+- Real-time health data visualization
+- Community health risk assessment
+- Individual health risk analysis
+- Resource optimization recommendations
+- Interactive data maps and charts
+- AI-powered health insights
+
+## Project info
+
+**URL**: https://lovable.dev/projects/fcb93237-a2d8-4b75-8b9e-c85054bdd080
 
 ## How can I edit this code?
 
@@ -62,17 +125,6 @@ npm run dev
 - Select the "Codespaces" tab.
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Google Gemini AI
 
 ## How can I deploy this project?
 

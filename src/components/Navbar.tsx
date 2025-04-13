@@ -1,8 +1,8 @@
-
 import { Menu, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./ThemeProvider";
+import { SignInButton, SignUpButton, useUser } from "@clerk/clerk-react";
 
 interface NavbarProps {
   toggleSidebar: () => void;
@@ -10,6 +10,7 @@ interface NavbarProps {
 
 const Navbar = ({ toggleSidebar }: NavbarProps) => {
   const { theme, setTheme } = useTheme();
+  const { isSignedIn } = useUser();
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
@@ -34,6 +35,20 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
           </Link>
         </div>
         <div className="flex items-center gap-2">
+          {!isSignedIn ? (
+            <>
+              <SignInButton mode="modal">
+                <Button variant="ghost">Sign In</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button variant="default">Sign Up</Button>
+              </SignUpButton>
+            </>
+          ) : (
+            <Button variant="ghost" asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

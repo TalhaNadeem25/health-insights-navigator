@@ -1,38 +1,48 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import RiskAssessment from "./pages/RiskAssessment";
-import DataUpload from "./pages/DataUpload";
 import ResourceOptimization from "./pages/ResourceOptimization";
-import NotFound from "./pages/NotFound";
-import Layout from "./components/Layout";
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 
-const queryClient = new QueryClient();
+function App() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/risk-assessment" element={<RiskAssessment />} />
-            <Route path="/data-upload" element={<DataUpload />} />
-            <Route path="/resource-optimization" element={<ResourceOptimization />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar toggleSidebar={toggleSidebar} />
+      <div className="flex h-[calc(100vh-4rem)]">
+        <Sidebar isOpen={isSidebarOpen} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background">
+            <SignedIn>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/risk-assessment" element={<RiskAssessment />} />
+                <Route path="/resource-optimization" element={<ResourceOptimization />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </SignedIn>
+            <SignedOut>
+              <Routes>
+                <Route path="/sign-in" element={<SignIn />} />
+                <Route path="/sign-up" element={<SignUp />} />
+                <Route path="*" element={<Navigate to="/sign-in" replace />} />
+              </Routes>
+            </SignedOut>
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default App;
