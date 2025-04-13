@@ -8,6 +8,8 @@ import RiskAssessment from "./pages/RiskAssessment";
 import ResourceOptimization from "./pages/ResourceOptimization";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import Home from "./pages/Index";
+import DataUpload from "./pages/DataUpload";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -22,22 +24,59 @@ function App() {
       <div className="flex h-[calc(100vh-4rem)]">
         <Sidebar isOpen={isSidebarOpen} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background">
-            <SignedIn>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/risk-assessment" element={<RiskAssessment />} />
-                <Route path="/resource-optimization" element={<ResourceOptimization />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </SignedIn>
-            <SignedOut>
-              <Routes>
-                <Route path="/sign-in" element={<SignIn />} />
-                <Route path="/sign-up" element={<SignUp />} />
-                <Route path="*" element={<Navigate to="/sign-in" replace />} />
-              </Routes>
-            </SignedOut>
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-4">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <SignedIn>
+                    <Dashboard />
+                  </SignedIn>
+                }
+              />
+              <Route
+                path="/risk-assessment"
+                element={
+                  <SignedIn>
+                    <RiskAssessment />
+                  </SignedIn>
+                }
+              />
+              <Route
+                path="/resource-optimization"
+                element={
+                  <SignedIn>
+                    <ResourceOptimization />
+                  </SignedIn>
+                }
+              />
+              <Route
+                path="/data-upload"
+                element={
+                  <SignedIn>
+                    <DataUpload />
+                  </SignedIn>
+                }
+              />
+              <Route
+                path="/sign-in"
+                element={
+                  <SignedOut>
+                    <SignIn />
+                  </SignedOut>
+                }
+              />
+              <Route
+                path="/sign-up"
+                element={
+                  <SignedOut>
+                    <SignUp />
+                  </SignedOut>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </main>
         </div>
       </div>

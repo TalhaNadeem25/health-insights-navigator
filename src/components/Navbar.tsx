@@ -2,7 +2,7 @@ import { Menu, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./ThemeProvider";
-import { SignInButton, SignUpButton, useUser } from "@clerk/clerk-react";
+import { SignInButton, SignUpButton, useUser, useClerk } from "@clerk/clerk-react";
 
 interface NavbarProps {
   toggleSidebar: () => void;
@@ -10,7 +10,8 @@ interface NavbarProps {
 
 const Navbar = ({ toggleSidebar }: NavbarProps) => {
   const { theme, setTheme } = useTheme();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
@@ -25,29 +26,35 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle sidebar</span>
           </Button>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-health-600 text-white font-bold">
-              H+
-            </div>
-            <span className="hidden md:inline-block font-semibold text-lg">
-              HealthInsights
-            </span>
-          </Link>
         </div>
         <div className="flex items-center gap-2">
-          {!isSignedIn ? (
+          {!isSignedIn && (
             <>
               <SignInButton mode="modal">
-                <Button variant="ghost">Sign In</Button>
+                <Button className="bg-health-600 text-white hover:bg-health-700">
+                  Sign In
+                </Button>
               </SignInButton>
               <SignUpButton mode="modal">
-                <Button variant="default">Sign Up</Button>
+                <Button variant="outline" className="border-health-600 text-health-600 hover:bg-health-50">
+                  Sign Up
+                </Button>
               </SignUpButton>
             </>
-          ) : (
-            <Button variant="ghost" asChild>
-              <Link to="/dashboard">Dashboard</Link>
-            </Button>
+          )}
+          {isSignedIn && (
+            <>
+              <Button variant="ghost" asChild>
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => signOut()}
+                className="text-red-600 hover:text-red-700"
+              >
+                Sign Out
+              </Button>
+            </>
           )}
           <Button
             variant="ghost"

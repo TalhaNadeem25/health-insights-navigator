@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
-import { BarChart, LineChart, Layers, Users, AlertTriangle, Info } from "lucide-react";
+import { BarChart, LineChart, Layers, Users, AlertTriangle, Info, AlertCircle, FileUp, TrendingUp, Activity, Map, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import CommunityMap from "@/components/CommunityMap";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CommunityMap } from "@/components/CommunityMap";
 import { TrendChart } from "@/components/TrendChart";
 import RiskBreakdown from "@/components/RiskBreakdown";
 import LLMInsights from "@/components/LLMInsights";
 import { healthDataService } from "@/lib/healthDataService";
 import { CommunityData, CommunityInsight, HealthTrend, RiskFactor } from "@/types/health";
 import { Loader2 } from "lucide-react";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { fetchHealthNews, NewsArticle } from '@/lib/newsService';
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +24,10 @@ const Dashboard = () => {
   const [communityData, setCommunityData] = useState<CommunityData[]>([]);
   const [healthTrends, setHealthTrends] = useState<HealthTrend[]>([]);
   const [riskFactors, setRiskFactors] = useState<RiskFactor[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [healthNews, setHealthNews] = useState<NewsArticle[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,6 +54,24 @@ const Dashboard = () => {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    loadHealthNews();
+  }, []);
+
+  const loadHealthNews = async () => {
+    setNewsLoading(true);
+    setNewsError(null);
+    try {
+      const newsData = await fetchHealthNews();
+      setHealthNews(newsData);
+    } catch (error) {
+      setNewsError('Failed to load health news');
+      console.error('Error loading health news:', error);
+    } finally {
+      setNewsLoading(false);
+    }
+  };
 
   const getStatusColor = (score: number) => {
     if (score >= 75) return "bg-red-500";
@@ -119,6 +144,103 @@ const Dashboard = () => {
     }
     
     return insights;
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) {
+      setError('Please select a file first');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Handle file upload logic here
+      console.log('File uploaded:', selectedFile.name);
+    } catch (err) {
+      setError('Failed to upload file');
+      console.error('Upload error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderNewsCard = (article: NewsArticle) => (
+    <Card key={article.url} className="mb-4">
+      <CardContent className="pt-6">
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold text-lg">{article.title}</h3>
+          <p className="text-sm text-muted-foreground">{article.description}</p>
+          <div className="flex justify-between items-center mt-2">
+            <span className="text-xs text-muted-foreground">{article.source.name}</span>
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              Read more
+            </a>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderNewsSection = (category: NewsArticle['category']) => {
+    const filteredNews = healthNews.filter(article => article.category === category);
+    
+    if (newsLoading) {
+      return (
+        <div className="flex items-center justify-center p-4">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      );
+    }
+
+    if (newsError) {
+      return (
+        <div className="text-red-500 p-4">
+          {newsError}
+          <Button variant="outline" onClick={loadHealthNews} className="ml-2">
+            Retry
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredNews.map((article) => (
+          <Card key={article.url} className="hover:bg-gray-50 transition-colors">
+            <CardHeader>
+              <CardTitle className="text-lg">{article.title}</CardTitle>
+              <CardDescription>{article.source.name}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">{article.description}</p>
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700 text-sm mt-2 inline-block"
+              >
+                Read more
+              </a>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   };
 
   if (error) {
@@ -262,7 +384,7 @@ const Dashboard = () => {
                 <CardContent className="h-[500px] p-0">
                   <CommunityMap 
                     isLoading={isLoading} 
-                    communityData={communityData}
+                    communities={communityData}
                   />
                 </CardContent>
               </Card>
@@ -390,6 +512,194 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
+
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Communities</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">12</div>
+                    <p className="text-xs text-muted-foreground">
+                      +2 from last month
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Risk Score</CardTitle>
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">7.2</div>
+                    <p className="text-xs text-muted-foreground">
+                      -0.3 from last week
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Active Reports</CardTitle>
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">24</div>
+                    <p className="text-xs text-muted-foreground">
+                      +4 new reports
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Map Coverage</CardTitle>
+                    <Map className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">85%</div>
+                    <p className="text-xs text-muted-foreground">
+                      +5% coverage increase
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <Card className="col-span-4">
+                  <CardHeader>
+                    <CardTitle>Risk Trends</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'disease' || article.category === 'healthcare')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Risk Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'policy' || article.category === 'research')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <Card className="col-span-4">
+                  <CardHeader>
+                    <CardTitle>Healthcare Analytics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'healthcare')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Research Insights</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'research')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                <Card className="col-span-4">
+                  <CardHeader>
+                    <CardTitle>Policy Updates</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'policy')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Disease Alerts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {newsLoading ? (
+                      <div className="flex items-center justify-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {healthNews
+                          .filter(article => article.category === 'disease')
+                          .slice(0, 3)
+                          .map(renderNewsCard)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
         </>
       )}
     </div>

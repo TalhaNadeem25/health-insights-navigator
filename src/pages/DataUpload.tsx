@@ -1,11 +1,11 @@
-
 import { useState } from "react";
-import { FileText, Upload, FileUp, FilePlus, Check, Loader2, AlertTriangle, FileQuestion } from "lucide-react";
+import { FileText, Upload, FileUp, FilePlus, Check, Loader2, AlertTriangle, FileQuestion, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { geminiAnalyzeHealth } from "@/lib/gemini";
 
 const DataUpload = () => {
   const [files, setFiles] = useState<File[]>([]);
@@ -20,6 +20,12 @@ const DataUpload = () => {
     type: string;
     status: "analyzing" | "analyzed" | "error";
     insights: string;
+  }>>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    name: string;
+    size: string;
+    type: string;
+    content: string;
   }>>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,57 +42,121 @@ const DataUpload = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const uploadFiles = () => {
+  const uploadFiles = async () => {
     if (files.length === 0) return;
 
     setIsUploading(true);
     setUploadStatus("uploading");
+    setUploadProgress(0);
     
-    // Simulate file upload with progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 5;
-      setUploadProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        setIsUploading(false);
-        setUploadStatus("success");
-        setIsAnalyzing(true);
-        
-        // Simulate LLM analysis of files
-        setTimeout(() => {
-          const analyzed = files.map((file) => ({
-            name: file.name,
-            size: formatFileSize(file.size),
-            type: file.type.split("/")[1].toUpperCase(),
-            status: "analyzed" as const,
-            insights: "LLM analysis indicates several mentions of respiratory health concerns in the Northeast district, particularly among children. There's a correlation with air quality issues reported in the same area. Consider prioritizing asthma screening resources in this community.",
-          }));
-          setAnalyzedFiles(analyzed);
-          setIsAnalyzing(false);
-        }, 3000);
-      }
-    }, 100);
+    try {
+      // Start progress animation
+      const startTime = Date.now();
+      const duration = 5000; // 5 seconds
+
+      // Process files first but don't update UI yet
+      const uploadedFilesPromise = Promise.all(
+        files.map(async (file) => ({
+          name: file.name,
+          size: formatFileSize(file.size),
+          type: file.type.split("/")[1].toUpperCase(),
+          content: await file.text()
+        }))
+      );
+
+      // Run the progress animation
+      return new Promise((resolve) => {
+        const progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min((elapsed / duration) * 100, 99);
+          setUploadProgress(progress);
+          
+          if (elapsed >= duration) {
+            clearInterval(progressInterval);
+            
+            // Once animation is complete, resolve with the uploaded files
+            uploadedFilesPromise.then(uploaded => {
+              setUploadProgress(100);
+              setUploadedFiles(uploaded);
+              setUploadStatus("success");
+              setIsUploading(false);
+              resolve(uploaded);
+            });
+          }
+        }, 50); // Update every 50ms for smooth animation
+      });
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      setUploadStatus("error");
+      setIsUploading(false);
+    }
   };
 
-  const analyzeText = () => {
+  const analyzeFiles = async () => {
+    if (uploadedFiles.length === 0) return;
+
+    setIsAnalyzing(true);
+    setAnalyzedFiles([]);
+    
+    try {
+      const analyzed = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          const result = await geminiAnalyzeHealth({
+            freeFormReport: file.content,
+          });
+
+          return {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            status: result.success ? "analyzed" as const : "error" as const,
+            insights: result.analysis,
+          };
+        })
+      );
+      
+      setAnalyzedFiles(analyzed);
+    } catch (error) {
+      console.error("Error analyzing files:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeText = async () => {
     if (!textInput.trim()) return;
 
     setIsAnalyzing(true);
+    setAnalyzedFiles([]);
     
-    // Simulate LLM analysis of text input
-    setTimeout(() => {
+    try {
+      const result = await geminiAnalyzeHealth({
+        freeFormReport: textInput,
+      });
+
       const newAnalyzedFile = {
         name: "Text Input Analysis",
         size: `${textInput.length} chars`,
         type: "TEXT",
-        status: "analyzed" as const,
-        insights: "Text analysis reveals recurring concerns about medication access in the Southgate community, particularly for chronic conditions like diabetes. Many individuals report having to travel over 30 minutes to the nearest pharmacy. This aligns with previous transportation barrier reports in the same area. Recommend mobile pharmacy services or medication delivery programs for this community.",
+        status: result.success ? "analyzed" as const : "error" as const,
+        insights: result.analysis,
       };
-      setAnalyzedFiles([...analyzedFiles, newAnalyzedFile]);
+      
+      setAnalyzedFiles([newAnalyzedFile]);
+    } catch (error) {
+      console.error("Error analyzing text:", error);
+      const errorFile = {
+        name: "Text Input Analysis",
+        size: `${textInput.length} chars`,
+        type: "TEXT",
+        status: "error" as const,
+        insights: `Error analyzing text: ${error instanceof Error ? error.message : String(error)}`,
+      };
+      setAnalyzedFiles([errorFile]);
+    } finally {
       setIsAnalyzing(false);
       setTextInput("");
-    }, 3000);
+    }
   };
 
   return (
@@ -154,7 +224,29 @@ const DataUpload = () => {
                         </div>
                         <div>
                           {uploadStatus === "uploading" ? (
-                            <div className="h-5 w-5 rounded-full border-2 border-t-health-600 animate-spin" />
+                            <div className="flex items-center gap-2">
+                              <div className="h-5 w-5">
+                                <svg className="animate-spin h-5 w-5 text-health-600" viewBox="0 0 24 24">
+                                  <circle 
+                                    className="opacity-25" 
+                                    cx="12" 
+                                    cy="12" 
+                                    r="10" 
+                                    stroke="currentColor" 
+                                    strokeWidth="4"
+                                    fill="none"
+                                  />
+                                  <path 
+                                    className="opacity-75" 
+                                    fill="currentColor" 
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  />
+                                </svg>
+                              </div>
+                              <span className="text-xs text-health-600 animate-pulse">
+                                Processing...
+                              </span>
+                            </div>
                           ) : uploadStatus === "success" ? (
                             <Check className="h-5 w-5 text-green-500" />
                           ) : null}
@@ -167,24 +259,28 @@ const DataUpload = () => {
                     <div className="space-y-2">
                       <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                         <div 
-                          className="h-full bg-health-600 transition-all duration-150"
+                          className="h-full bg-health-600 transition-all duration-300 ease-out relative"
                           style={{ width: `${uploadProgress}%` }}
-                        />
+                        >
+                          <div className="absolute inset-0 bg-white/20 animate-[pulse_1.5s_ease-in-out_infinite]" />
+                        </div>
                       </div>
-                      <p className="text-xs text-center text-muted-foreground">
-                        Uploading... {uploadProgress}%
-                      </p>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Uploading files...</span>
+                        <span className="font-medium">{Math.round(uploadProgress)}%</span>
+                      </div>
                     </div>
                   )}
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
                     <Button 
                       onClick={uploadFiles} 
                       disabled={isUploading || uploadStatus === "success"}
-                      className="bg-health-600 hover:bg-health-700"
+                      className={`relative ${uploadStatus === "uploading" ? 'bg-health-600/80' : 'bg-health-600'} hover:bg-health-700`}
                     >
                       {isUploading ? (
                         <>
+                          <div className="absolute inset-0 bg-white/10 animate-pulse rounded-md" />
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Uploading...
                         </>
@@ -200,6 +296,25 @@ const DataUpload = () => {
                         </>
                       )}
                     </Button>
+                    {uploadStatus === "success" && (
+                      <Button 
+                        onClick={analyzeFiles} 
+                        disabled={isAnalyzing}
+                        className="bg-health-600 hover:bg-health-700"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="mr-2 h-4 w-4" />
+                            Analyze Files
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -316,9 +431,57 @@ const DataUpload = () => {
                         </div>
                       </div>
                       <div className="p-4">
-                        <h3 className="font-medium mb-2">LLM-Generated Insights</h3>
-                        <div className="text-sm text-muted-foreground">
-                          {file.insights}
+                        <h3 className="font-medium mb-4 text-lg flex items-center gap-2">
+                          <Brain className="h-5 w-5 text-health-600" />
+                          LLM-Generated Insights
+                        </h3>
+                        <div className="space-y-6 text-sm">
+                          {file.status === "analyzed" && (
+                            <>
+                              {file.insights.split('**').map((section, idx) => {
+                                // Skip empty sections
+                                if (!section.trim()) return null;
+                                
+                                // Check if this is a header section
+                                if (section.includes(':')) {
+                                  const [header, content] = section.split(':');
+                                  return (
+                                    <div key={idx} className="space-y-2">
+                                      <h4 className="font-semibold text-base text-health-600">
+                                        {header.trim()}
+                                      </h4>
+                                      <div className="pl-4">
+                                        {content.split('*').map((item, itemIdx) => {
+                                          const trimmedItem = item.trim();
+                                          if (!trimmedItem) return null;
+                                          return (
+                                            <div key={itemIdx} className="flex items-start gap-2 mb-2">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-health-600 mt-2" />
+                                              <p className="text-muted-foreground flex-1">
+                                                {trimmedItem}
+                                              </p>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                // Regular content
+                                return (
+                                  <p key={idx} className="text-muted-foreground">
+                                    {section.trim()}
+                                  </p>
+                                );
+                              })}
+                            </>
+                          )}
+                          {file.status === "error" && (
+                            <div className="text-red-500">
+                              {file.insights}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

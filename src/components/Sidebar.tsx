@@ -35,38 +35,24 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
         </div>
       </div>
       <nav className="flex-1 px-4 py-6 space-y-1">
-        {isSignedIn ? (
-          navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-health-600 text-white"
-                    : "text-foreground hover:bg-muted"
-                )
-              }
-              end={item.path === "/"}
-            >
-              <item.icon size={18} />
-              {item.label}
-            </NavLink>
-          ))
-        ) : (
-          <div className="space-y-4 py-4">
-            <div className="text-center mb-4">
-              <p className="text-sm text-muted-foreground mb-2">Sign in to access all features</p>
-            </div>
-            <SignInButton mode="modal">
-              <Button className="w-full bg-health-600 hover:bg-health-700">Sign In</Button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <Button variant="outline" className="w-full">Sign Up</Button>
-            </SignUpButton>
-          </div>
-        )}
+        {navItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-health-600 text-white"
+                  : "text-foreground hover:bg-muted"
+              )
+            }
+            end={item.path === "/"}
+          >
+            <item.icon size={18} />
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
       <div className="p-4 border-t">
         <div className="text-xs text-muted-foreground">
