@@ -4,6 +4,16 @@
 
 **URL**: https://lovable.dev/projects/fcb93237-a2d8-4b75-8b9e-c85054bdd080
 
+## Environment Variables
+
+This project uses environment variables for configuration. Create a `.env` file in the root directory with the following variables:
+
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+You can get a Gemini API key from [Google AI Studio](https://ai.google.dev/).
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
@@ -29,10 +39,13 @@ git clone <YOUR_GIT_URL>
 # Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+# Step 3: Create a .env file with your Gemini API key
+# Copy .env.example to .env and update with your API key
+
+# Step 4: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
@@ -59,6 +72,7 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Google Gemini AI
 
 ## How can I deploy this project?
 
