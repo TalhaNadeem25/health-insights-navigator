@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,6 +16,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { geminiAnalyzeHealth, getGeminiApiKey, setGeminiApiKey } from "@/lib/gemini";
 import { HealthReportAnalyzer } from "@/components/HealthReportAnalyzer";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { healthData as healthDataApi, predictions as predictionsApi } from "../lib/api";
 
 const formSchema = z.object({
   age: z.string().min(1, {
@@ -70,11 +72,18 @@ const RiskAssessment = () => {
     diabetesRisk: number | null;
     heartRisk: number | null;
     llmAnalysis: string | null;
+    keyFactors: string[];
+    confidence: number;
   }>({
     diabetesRisk: null,
     heartRisk: null,
     llmAnalysis: null,
+    keyFactors: [],
+    confidence: 0,
   });
+
+  const [submittedHealthDataId, setSubmittedHealthDataId] = useState<string | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -88,6 +97,99 @@ const RiskAssessment = () => {
       familyHistory: "",
       diet: "",
     },
+  });
+
+  // Query to get latest health data
+  const { data: latestHealthData, isLoading: isLoadingHealthData } = useQuery({
+    queryKey: ['latestHealthData'],
+    queryFn: async () => {
+      try {
+        const response = await healthDataApi.getLatest();
+        return response.healthData;
+      } catch (error) {
+        // If no health data exists yet, return null
+        if (error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    }
+  });
+
+  // Query to get latest prediction
+  const { data: latestPrediction, isLoading: isLoadingPrediction } = useQuery({
+    queryKey: ['latestPrediction'],
+    queryFn: async () => {
+      try {
+        const response = await predictionsApi.getLatest();
+        return response.prediction;
+      } catch (error) {
+        // If no prediction exists yet, return null
+        if (error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    }
+  });
+
+  // Mutation to submit health data
+  const submitHealthDataMutation = useMutation({
+    mutationFn: (data: any) => healthDataApi.submit(data),
+    onSuccess: (response) => {
+      setSubmittedHealthDataId(response.healthData._id);
+      toast({
+        title: "Health data submitted successfully",
+        description: "Your health data has been saved.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error submitting health data",
+        description: error.message || "Failed to submit health data",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutation to generate prediction
+  const generatePredictionMutation = useMutation({
+    mutationFn: (healthDataId: string) => predictionsApi.generate(healthDataId),
+    onSuccess: (response) => {
+      // If prediction already exists
+      if (response.isExisting) {
+        setAssessmentResults({
+          diabetesRisk: response.prediction.diabetesRisk.score,
+          heartRisk: response.prediction.heartDiseaseRisk.score,
+          llmAnalysis: response.prediction.analysis,
+          keyFactors: response.prediction.keyFactors.map(kf => kf.factor),
+          confidence: response.prediction.modelInfo.confidence,
+        });
+        toast({
+          title: "Existing prediction retrieved",
+          description: "A previous prediction for this health data was found.",
+        });
+      } else {
+        setAssessmentResults({
+          diabetesRisk: response.prediction.diabetesRisk.score,
+          heartRisk: response.prediction.heartDiseaseRisk.score,
+          llmAnalysis: response.prediction.analysis,
+          keyFactors: response.prediction.keyFactors.map(kf => kf.factor),
+          confidence: response.prediction.modelInfo.confidence,
+        });
+        toast({
+          title: "Prediction generated successfully",
+          description: "Your health risk assessment is ready.",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error generating prediction",
+        description: error.message || "Failed to generate prediction",
+        variant: "destructive",
+      });
+    }
   });
 
   const saveApiKey = () => {
@@ -113,30 +215,22 @@ const RiskAssessment = () => {
     setIsSubmitting(true);
     
     try {
-      if (!getGeminiApiKey()) {
-        setShowApiKeyInput(true);
-        setIsSubmitting(false);
-        return;
+      // Parse blood pressure string to systolic/diastolic
+      let bloodPressureObj = { systolic: 120, diastolic: 80 }; // Default values
+      if (values.bloodPressure && values.bloodPressure.includes('/')) {
+        const [systolic, diastolic] = values.bloodPressure.split('/').map(v => parseInt(v.trim()));
+        bloodPressureObj = { systolic, diastolic };
       }
       
-      // Use Gemini to analyze the health data
-      const result = await geminiAnalyzeHealth(values);
-      
-      if (!result.success) {
-        toast({
-          title: "Analysis Failed",
-          description: result.analysis,
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-      
-      setAssessmentResults({
-        diabetesRisk: result.diabetesRisk,
-        heartRisk: result.heartRisk,
-        llmAnalysis: result.analysis,
+      // Submit health data to backend
+      const healthDataResponse = await submitHealthDataMutation.mutateAsync({
+        ...values,
+        bloodPressure: bloodPressureObj
       });
+      
+      // Generate prediction from health data
+      setIsPredicting(true);
+      await generatePredictionMutation.mutateAsync(healthDataResponse.healthData._id);
     } catch (error) {
       console.error("Error during assessment:", error);
       toast({
@@ -146,8 +240,38 @@ const RiskAssessment = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setIsPredicting(false);
     }
   };
+
+  // Use existing prediction if available
+  useEffect(() => {
+    if (latestPrediction && !assessmentResults.diabetesRisk) {
+      setAssessmentResults({
+        diabetesRisk: latestPrediction.diabetesRisk.score,
+        heartRisk: latestPrediction.heartDiseaseRisk.score,
+        llmAnalysis: latestPrediction.analysis,
+        keyFactors: latestPrediction.keyFactors.map(kf => kf.factor),
+        confidence: latestPrediction.modelInfo.confidence,
+      });
+    }
+  }, [latestPrediction]);
+
+  // Pre-fill form with latest health data if available
+  useEffect(() => {
+    if (latestHealthData) {
+      form.reset({
+        age: latestHealthData.age.toString(),
+        gender: latestHealthData.gender,
+        bmi: latestHealthData.bmi.toString(),
+        bloodPressure: `${latestHealthData.bloodPressure.systolic}/${latestHealthData.bloodPressure.diastolic}`,
+        smokingStatus: latestHealthData.smokingStatus,
+        physicalActivity: latestHealthData.physicalActivity,
+        familyHistory: Object.values(latestHealthData.familyHistory).some(v => v) ? "yes" : "no",
+        diet: latestHealthData.diet
+      });
+    }
+  }, [latestHealthData]);
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
@@ -475,201 +599,156 @@ const RiskAssessment = () => {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue="summary" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="summary">Risk Summary</TabsTrigger>
-              <TabsTrigger value="diabetes">Diabetes Risk</TabsTrigger>
-              <TabsTrigger value="heart">Heart Disease Risk</TabsTrigger>
-            </TabsList>
-            <TabsContent value="summary">
-              <Card>
-                <CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                Health Risk Assessment Results
+              </CardTitle>
+              <CardDescription>
+                AI-powered analysis based on your health data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Diabetes Risk</h3>
                   <div className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-health-600" />
-                    <CardTitle>Google Gemini Powered Health Risk Analysis</CardTitle>
+                    <div
+                      className="h-3 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                      style={{ width: "100%" }}
+                    />
+                    <span className="text-sm font-medium">
+                      {assessmentResults.diabetesRisk}/100
+                    </span>
                   </div>
-                  <CardDescription>
-                    Personalized assessment based on your health information
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-muted rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium">Diabetes Risk</h3>
-                        <div className={`font-bold ${getRiskLevel(assessmentResults.diabetesRisk!).color}`}>
-                          {assessmentResults.diabetesRisk}/100
-                        </div>
-                      </div>
-                      <div className="w-full h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-health-600" 
-                          style={{ width: `${assessmentResults.diabetesRisk}%` }}
-                        />
-                      </div>
-                      <p className={`text-sm mt-1 ${getRiskLevel(assessmentResults.diabetesRisk!).color}`}>
-                        {getRiskLevel(assessmentResults.diabetesRisk!).label}
-                      </p>
-                    </div>
-                    <div className="bg-muted rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium">Heart Disease Risk</h3>
-                        <div className={`font-bold ${getRiskLevel(assessmentResults.heartRisk!).color}`}>
-                          {assessmentResults.heartRisk}/100
-                        </div>
-                      </div>
-                      <div className="w-full h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-health-600" 
-                          style={{ width: `${assessmentResults.heartRisk}%` }}
-                        />
-                      </div>
-                      <p className={`text-sm mt-1 ${getRiskLevel(assessmentResults.heartRisk!).color}`}>
-                        {getRiskLevel(assessmentResults.heartRisk!).label}
-                      </p>
-                    </div>
+                  <p className="text-sm mt-2 text-muted-foreground">
+                    {getRiskLevel(assessmentResults.diabetesRisk!).label}
+                  </p>
+                </div>
+
+                <div className="flex-1 border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Heart Disease Risk</h3>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-3 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+                      style={{ width: "100%" }}
+                    />
+                    <span className="text-sm font-medium">
+                      {assessmentResults.heartRisk}/100
+                    </span>
                   </div>
-
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-medium mb-2 flex items-center gap-2">
-                      <Brain className="h-4 w-4 text-health-600" />
-                      Gemini LLM Analysis
-                    </h3>
-                    <p className="text-muted-foreground text-sm whitespace-pre-line">
-                      {assessmentResults.llmAnalysis}
-                    </p>
+                  <p className="text-sm mt-2 text-muted-foreground">
+                    {getRiskLevel(assessmentResults.heartRisk!).label}
+                  </p>
+                </div>
+                
+                <div className="flex-1 border rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">AI Confidence</h3>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-3 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"
+                      style={{ width: "100%" }}
+                    />
+                    <span className="text-sm font-medium">
+                      {Math.round(assessmentResults.confidence * 100)}%
+                    </span>
                   </div>
+                  <p className="text-sm mt-2 text-muted-foreground">
+                    {assessmentResults.confidence >= 0.7 
+                      ? "High Confidence" 
+                      : assessmentResults.confidence >= 0.4 
+                      ? "Moderate Confidence" 
+                      : "Low Confidence"}
+                  </p>
+                </div>
+              </div>
 
-                  <Alert className="bg-muted/50 border-health-200">
-                    <Check className="h-4 w-4 text-health-600" />
-                    <AlertTitle>Powered by Google Gemini</AlertTitle>
-                    <AlertDescription>
-                      This analysis was generated by Google&apos;s Gemini large language model.
-                      Always consult healthcare professionals before making medical decisions.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="bg-muted/50 p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Recommended Next Steps</h3>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                      <li>Consult with a healthcare provider about your risk assessment</li>
-                      <li>Discuss potential screenings for diabetes and heart health</li>
-                      <li>Consider lifestyle modifications to reduce your risk factors</li>
-                      <li>Follow up with your primary care provider within 3 months</li>
+              <div className="border rounded-lg">
+                <div className="p-4">
+                  <h3 className="font-semibold mb-2">Key Risk Factors</h3>
+                  {assessmentResults.keyFactors.length > 0 ? (
+                    <ul className="space-y-2">
+                      {assessmentResults.keyFactors.map((factor, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs mt-0.5">
+                            {index + 1}
+                          </div>
+                          <span className="text-sm">{factor}</span>
+                        </li>
+                      ))}
                     </ul>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowApiKeyInput(true)}
-                  >
-                    Change API Key
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setAssessmentResults({ diabetesRisk: null, heartRisk: null, llmAnalysis: null })}
-                  >
-                    Start New Assessment
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-            <TabsContent value="diabetes">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Diabetes Risk Factors</CardTitle>
-                  <CardDescription>
-                    Detailed breakdown of factors contributing to your diabetes risk
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="rounded-lg overflow-hidden border">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="text-left py-3 px-4">Risk Factor</th>
-                            <th className="text-left py-3 px-4">Your Value</th>
-                            <th className="text-left py-3 px-4">Impact</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {diabetesRiskFactors.map((factor, index) => (
-                            <tr key={index} className="border-t">
-                              <td className="py-3 px-4">{factor.factor}</td>
-                              <td className="py-3 px-4">{factor.value}</td>
-                              <td className={`py-3 px-4 font-medium ${getImpactColor(factor.impact)}`}>
-                                {factor.impact}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No specific risk factors identified.</p>
+                  )}
+                </div>
+              </div>
 
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <h3 className="font-medium mb-2">Diabetes Prevention Recommendations</h3>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li>Focus on weight management through a balanced diet and regular exercise</li>
-                        <li>Limit intake of refined carbohydrates and added sugars</li>
-                        <li>Increase physical activity to at least 150 minutes per week</li>
-                        <li>Get regular blood glucose screenings</li>
-                        <li>Consider working with a registered dietitian to develop a personalized meal plan</li>
-                      </ul>
-                    </div>
+              <div className="border rounded-lg">
+                <div className="p-4">
+                  <h3 className="font-semibold mb-2">LLM Analysis</h3>
+                  <div className="text-sm whitespace-pre-wrap">
+                    {assessmentResults.llmAnalysis}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="heart">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Heart Disease Risk Factors</CardTitle>
-                  <CardDescription>
-                    Detailed breakdown of factors contributing to your heart disease risk
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="rounded-lg overflow-hidden border">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="text-left py-3 px-4">Risk Factor</th>
-                            <th className="text-left py-3 px-4">Your Value</th>
-                            <th className="text-left py-3 px-4">Impact</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {heartRiskFactors.map((factor, index) => (
-                            <tr key={index} className="border-t">
-                              <td className="py-3 px-4">{factor.factor}</td>
-                              <td className="py-3 px-4">{factor.value}</td>
-                              <td className={`py-3 px-4 font-medium ${getImpactColor(factor.impact)}`}>
-                                {factor.impact}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                </div>
+              </div>
 
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <h3 className="font-medium mb-2">Heart Health Recommendations</h3>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li>Work with your healthcare provider to manage your blood pressure</li>
-                        <li>Follow a heart-healthy diet like the DASH or Mediterranean diet</li>
-                        <li>Limit sodium intake to help control blood pressure</li>
-                        <li>Incorporate regular aerobic exercise and strength training</li>
-                        <li>Consider stress reduction techniques such as meditation or yoga</li>
-                      </ul>
-                    </div>
+              <Tabs defaultValue="diabetes">
+                <TabsList className="w-full">
+                  <TabsTrigger value="diabetes">Diabetes Risk Factors</TabsTrigger>
+                  <TabsTrigger value="heart">Heart Disease Risk Factors</TabsTrigger>
+                </TabsList>
+                <TabsContent value="diabetes">
+                  <div className="border rounded-lg divide-y">
+                    {diabetesRiskFactors.map((factor, index) => (
+                      <div
+                        key={index}
+                        className="p-3 flex items-center justify-between"
+                      >
+                        <div>
+                          <h4 className="font-medium">{factor.factor}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {factor.value}
+                          </p>
+                        </div>
+                        <div
+                          className={`text-sm font-medium ${getImpactColor(
+                            factor.impact
+                          )}`}
+                        >
+                          {factor.impact} Impact
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                </TabsContent>
+                <TabsContent value="heart">
+                  <div className="border rounded-lg divide-y">
+                    {heartRiskFactors.map((factor, index) => (
+                      <div
+                        key={index}
+                        className="p-3 flex items-center justify-between"
+                      >
+                        <div>
+                          <h4 className="font-medium">{factor.factor}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {factor.value}
+                          </p>
+                        </div>
+                        <div
+                          className={`text-sm font-medium ${getImpactColor(
+                            factor.impact
+                          )}`}
+                        >
+                          {factor.impact} Impact
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

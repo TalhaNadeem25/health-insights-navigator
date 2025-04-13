@@ -1,6 +1,5 @@
-
 import { NavLink } from "react-router-dom";
-import { BarChart3, FileText, Home, Upload, Users } from "lucide-react";
+import { BarChart3, FileText, Home, Upload, Users, Server, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -13,6 +12,8 @@ const navItems = [
   { path: "/risk-assessment", label: "Risk Assessment", icon: Users },
   { path: "/data-upload", label: "Data Upload", icon: Upload },
   { path: "/resource-optimization", label: "Resource Optimization", icon: FileText },
+  { path: "/model-deployment", label: "Model Deployment", icon: Server },
+  { path: "/settings", label: "Settings", icon: Settings },
 ];
 
 const Sidebar = ({ isOpen }: SidebarProps) => {

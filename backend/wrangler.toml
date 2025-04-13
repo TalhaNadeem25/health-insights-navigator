@@ -1,0 +1,16 @@
+name = "health-insights-api"
+main = "deploy-cloudflare-worker.js"
+compatibility_date = "2023-11-01"
+node_compat = true
+
+[vars]
+# The variables will be set through the Cloudflare dashboard or via GitHub secrets
+
+# MongoDB connection
+# MONGODB_URI = "mongodb+srv://username:password@cluster.mongodb.net/db?retryWrites=true&w=majority"
+
+# JWT secret for authentication
+# JWT_SECRET = "your-jwt-secret"
+
+# Gemini API key
+# GEMINI_API_KEY = "your-gemini-api-key" 

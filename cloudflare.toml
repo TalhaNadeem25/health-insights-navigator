@@ -1,0 +1,14 @@
+[build]
+command = "npm run build"
+directory = "dist"
+
+[site]
+bucket = "./dist"
+
+[env]
+NODE_VERSION = "18"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200 

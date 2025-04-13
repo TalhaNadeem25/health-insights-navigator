@@ -29,3 +29,24 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Cloudflare
+.wrangler/
+.dev.vars
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Build artifacts
+dist/
+.cloudflare/
+
+# Cache
+.cache/
+.wrangler/
+.mf/
+
+# Misc
+.DS_Store

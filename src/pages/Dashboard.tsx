@@ -1,397 +1,203 @@
-import { useEffect, useState } from "react";
-import { BarChart, LineChart, Layers, Users, AlertTriangle, Info } from "lucide-react";
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import CommunityMap from "@/components/CommunityMap";
-import { TrendChart } from "@/components/TrendChart";
-import RiskBreakdown from "@/components/RiskBreakdown";
-import LLMInsights from "@/components/LLMInsights";
-import { healthDataService } from "@/lib/healthDataService";
-import { CommunityData, CommunityInsight, HealthTrend, RiskFactor } from "@/types/health";
-import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import apiModule from '@/lib/api';
+
+const { assessments } = apiModule;
+
+interface HealthMetrics {
+  diabetesRisk: number | null;
+  heartRisk: number | null;
+  lastUpdated: string | null;
+  recommendations?: string[];
+}
 
 const Dashboard = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [error, setError] = useState<string | null>(null);
-  const [communityData, setCommunityData] = useState<CommunityData[]>([]);
-  const [healthTrends, setHealthTrends] = useState<HealthTrend[]>([]);
-  const [riskFactors, setRiskFactors] = useState<RiskFactor[]>([]);
+  const { user, logout, updateProfile } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetrics>({
+    diabetesRisk: null,
+    heartRisk: null,
+    lastUpdated: null,
+    recommendations: []
+  });
 
+  // Fetch health metrics on component mount
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchHealthMetrics = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
-
-        const [communities, trends, factors] = await Promise.all([
-          healthDataService.getCommunityData(),
-          healthDataService.getHealthTrends(),
-          healthDataService.getRiskFactors()
-        ]);
-
-        setCommunityData(communities);
-        setHealthTrends(trends);
-        setRiskFactors(factors);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch health data');
-        console.error('Error fetching dashboard data:', err);
+        setLoading(true);
+        // Try to get the latest health assessment
+        const response = await assessments.getLatest();
+        if (response.success && response.assessment) {
+          setHealthMetrics({
+            diabetesRisk: response.assessment.diabetesRisk,
+            heartRisk: response.assessment.heartRisk,
+            lastUpdated: response.assessment.updatedAt,
+            recommendations: response.assessment.recommendations
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch health metrics:', error);
+        // If no assessments found, that's expected for new users
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
-
-  const getStatusColor = (score: number) => {
-    if (score >= 75) return "bg-red-500";
-    if (score >= 50) return "bg-amber-500";
-    return "bg-green-500";
-  };
-
-  const getHighRiskCommunities = () => {
-    return communityData.filter(community => community.riskScore >= 75).length;
-  };
-
-  const getAtRiskPopulation = () => {
-    return communityData
-      .filter(community => community.riskScore >= 75)
-      .reduce((total, community) => total + community.population, 0);
-  };
-
-  const getResourceCoverage = () => {
-    const highRiskCommunities = communityData.filter(community => community.riskScore >= 75);
-    const coveredCommunities = highRiskCommunities.filter(community => 
-      community.riskFactors.every(factor => factor.value < 0.7)
-    );
-    return (coveredCommunities.length / highRiskCommunities.length) * 100;
-  };
-
-  const generateInsights = (): CommunityInsight[] => {
-    if (!communityData.length || !riskFactors.length) return [];
-    
-    // Generate insights based on community data and risk factors
-    const insights: CommunityInsight[] = [];
-    
-    // Example insight for high-risk communities
-    const highRiskCommunities = communityData.filter(community => community.riskScore >= 75);
-    if (highRiskCommunities.length > 0) {
-      insights.push({
-        communityId: "all",
-        type: "risk",
-        title: "High Risk Communities Identified",
-        description: `${highRiskCommunities.length} communities have been identified as high-risk areas with risk scores above 75%.`,
-        confidence: 0.95,
-        generationDate: new Date().toISOString(),
-        recommendations: [
-          "Increase healthcare resource allocation to these communities",
-          "Implement targeted health education programs",
-          "Conduct detailed health assessments"
-        ],
-        sources: ["Community Health Data", "Risk Assessment Reports"]
-      });
+    if (user) {
+      fetchHealthMetrics();
     }
-    
-    // Example insight for risk factors
-    const topRiskFactor = riskFactors.reduce((prev, current) => 
-      (current.value > prev.value) ? current : prev
-    );
-    
-    if (topRiskFactor) {
-      insights.push({
-        communityId: "all",
-        type: "trend",
-        title: `Primary Health Risk: ${topRiskFactor.type}`,
-        description: `${topRiskFactor.type} is the most significant health risk factor across communities with a value of ${Math.round(topRiskFactor.value * 100)}%.`,
-        confidence: 0.9,
-        generationDate: new Date().toISOString(),
-        recommendations: [
-          `Develop targeted interventions for ${topRiskFactor.type}`,
-          "Monitor trends and adjust strategies accordingly"
-        ],
-        sources: ["Risk Factor Analysis", "Health Trend Data"]
-      });
-    }
-    
-    return insights;
+  }, [user]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
-  if (error) {
-    return (
-      <Alert variant="destructive" className="m-4">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
+  const handleStartAssessment = () => {
+    navigate('/risk-assessment');
+  };
+
+  const handleUpdateProfile = () => {
+    navigate('/profile');
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const getRiskLevel = (score: number | null) => {
+    if (score === null) return { label: "Unknown", color: "text-gray-500" };
+    if (score >= 75) return { label: "High Risk", color: "text-red-500" };
+    if (score >= 50) return { label: "Moderate Risk", color: "text-amber-500" };
+    return { label: "Low Risk", color: "text-green-500" };
+  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Community Risk Dashboard</h1>
-          <p className="text-muted-foreground">
-            Real-time insights into community health risks and resource needs
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={activeFilter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("all")}
-            className={activeFilter === "all" ? "bg-health-600 hover:bg-health-700" : ""}
-          >
-            All Risks
-          </Button>
-          <Button
-            variant={activeFilter === "diabetes" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("diabetes")}
-            className={activeFilter === "diabetes" ? "bg-health-600 hover:bg-health-700" : ""}
-          >
-            Diabetes
-          </Button>
-          <Button
-            variant={activeFilter === "heart" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("heart")}
-            className={activeFilter === "heart" ? "bg-health-600 hover:bg-health-700" : ""}
-          >
-            Heart Disease
-          </Button>
-          <Button
-            variant={activeFilter === "respiratory" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("respiratory")}
-            className={activeFilter === "respiratory" ? "bg-health-600 hover:bg-health-700" : ""}
-          >
-            Respiratory
-          </Button>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-health-600" />
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="dashboard-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium">High Risk Communities</CardTitle>
-                <BarChart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{getHighRiskCommunities()}</div>
-                <p className="text-sm text-muted-foreground">Communities need immediate attention</p>
-                <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
-                  <div 
-                    className="h-1 bg-health-600 rounded-full" 
-                    style={{ width: `${(getHighRiskCommunities() / communityData.length) * 100}%` }} 
-                  />
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground flex justify-between">
-                  <span>0 communities</span>
-                  <span>{communityData.length} communities</span>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="dashboard-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium">At-Risk Population</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{getAtRiskPopulation().toLocaleString()}</div>
-                <p className="text-sm text-muted-foreground">People in high-risk communities</p>
-                <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
-                  <div 
-                    className="h-1 bg-health-600 rounded-full" 
-                    style={{ width: `${(getAtRiskPopulation() / communityData.reduce((total, community) => total + community.population, 0)) * 100}%` }} 
-                  />
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground flex justify-between">
-                  <span>0 people</span>
-                  <span>{communityData.reduce((total, community) => total + community.population, 0).toLocaleString()} people</span>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="dashboard-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium">Resource Coverage</CardTitle>
-                <Layers className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{Math.round(getResourceCoverage())}%</div>
-                <p className="text-sm text-muted-foreground">Of high-risk areas have adequate resources</p>
-                <div className="mt-4 h-1 w-full bg-muted overflow-hidden rounded-full">
-                  <div 
-                    className="h-1 bg-amber-500 rounded-full" 
-                    style={{ width: `${getResourceCoverage()}%` }} 
-                  />
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground flex justify-between">
-                  <span>0%</span>
-                  <span>100%</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="map" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="map">Risk Map</TabsTrigger>
-              <TabsTrigger value="trends">Risk Trends</TabsTrigger>
-              <TabsTrigger value="breakdown">Risk Breakdown</TabsTrigger>
-              <TabsTrigger value="insights">LLM Insights</TabsTrigger>
-            </TabsList>
-            <TabsContent value="map" className="space-y-6">
-              <Card className="dashboard-card">
-                <CardHeader>
-                  <CardTitle>Community Risk Heatmap</CardTitle>
-                  <CardDescription>
-                    Geographic visualization of community health risks
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[500px] p-0">
-                  <CommunityMap 
-                    isLoading={isLoading} 
-                    communityData={communityData}
-                  />
-                </CardContent>
-              </Card>
-              <Card className="dashboard-card">
-                <CardHeader>
-                  <CardTitle>Communities at Risk</CardTitle>
-                  <CardDescription>
-                    Communities ranked by risk score based on real-time data
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-3 px-4 text-left">Community</th>
-                          <th className="py-3 px-4 text-center">Population</th>
-                          <th className="py-3 px-4 text-center">Risk Score</th>
-                          <th className="py-3 px-4 text-center">Risk Level</th>
-                          <th className="py-3 px-4 text-center">Trend</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {communityData.map((community) => (
-                          <tr key={community.id} className="border-b">
-                            <td className="py-3 px-4">{community.name}</td>
-                            <td className="py-3 px-4 text-center">{community.population.toLocaleString()}</td>
-                            <td className="py-3 px-4 text-center">{Math.round(community.riskScore)}/100</td>
-                            <td className="py-3 px-4 text-center">
-                              <div className="flex justify-center">
-                                <div className={`h-3 w-3 rounded-full ${getStatusColor(community.riskScore)}`} />
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <Badge
-                                variant="outline"
-                                className={
-                                  community.trends === "Increasing"
-                                    ? "border-red-500 text-red-500"
-                                    : community.trends === "Decreasing"
-                                    ? "border-green-500 text-green-500"
-                                    : "border-amber-500 text-amber-500"
-                                }
-                              >
-                                {community.trends}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="trends">
-              <Card className="dashboard-card">
-                <CardHeader>
-                  <CardTitle>Risk Trends Over Time</CardTitle>
-                  <CardDescription>
-                    Analyze how community risks have changed over time
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[500px] p-6">
-                  <TrendChart data={healthTrends} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="breakdown">
-              <Card className="dashboard-card">
-                <CardHeader>
-                  <CardTitle>Risk Factors Breakdown</CardTitle>
-                  <CardDescription>
-                    Analysis of key health risk factors in communities
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <RiskBreakdown 
-                    isLoading={isLoading} 
-                    riskFactors={riskFactors}
-                    communityData={communityData}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="insights">
-              <Card className="dashboard-card">
-                <CardHeader className="flex flex-row items-center space-x-2">
-                  <CardTitle>LLM-Generated Insights</CardTitle>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info size={16} className="text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">
-                          These insights are generated by analyzing real health data from various sources
-                          including health records, community surveys, and medical reports.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardHeader>
-                <CardContent>
-                  <LLMInsights 
-                    isLoading={isLoading} 
-                    insights={generateInsights()}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          <Card className="border-health-200 bg-health-50 dark:bg-health-950/20">
-            <CardHeader className="pb-2">
-              <div className="flex items-center">
-                <Info className="h-5 w-5 text-health-600 mr-2" />
-                <CardTitle className="text-health-800 dark:text-health-400 text-sm font-medium">Data Sources</CardTitle>
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome Back!</CardTitle>
+            <CardDescription>Your personal health dashboard</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-sm text-gray-500">Name</h3>
+                <p className="font-medium">{user?.name}</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-health-800/80 dark:text-health-400/80">
-                This dashboard uses real-time data from health records, community surveys, and medical reports.
-                Data is updated regularly to ensure accurate risk assessment and resource allocation.
+              <div>
+                <h3 className="font-medium text-sm text-gray-500">Email</h3>
+                <p className="font-medium">{user?.email}</p>
+              </div>
+              <div>
+                <h3 className="font-medium text-sm text-gray-500">Last Login</h3>
+                <p className="font-medium">Today</p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleLogout} variant="outline">Logout</Button>
+          </CardFooter>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Health Metrics</CardTitle>
+            <CardDescription>Your latest health data</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : healthMetrics.diabetesRisk !== null ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-sm text-gray-500">Diabetes Risk</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-primary h-2.5 rounded-full" 
+                        style={{ width: `${healthMetrics.diabetesRisk}%` }}
+                      ></div>
+                    </div>
+                    <span className={getRiskLevel(healthMetrics.diabetesRisk).color}>
+                      {getRiskLevel(healthMetrics.diabetesRisk).label}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm text-gray-500">Heart Disease Risk</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-primary h-2.5 rounded-full" 
+                        style={{ width: `${healthMetrics.heartRisk}%` }}
+                      ></div>
+                    </div>
+                    <span className={getRiskLevel(healthMetrics.heartRisk).color}>
+                      {getRiskLevel(healthMetrics.heartRisk).label}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm text-gray-500">Last Updated</h3>
+                  <p className="font-medium">{formatDate(healthMetrics.lastUpdated)}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">
+                No health data yet. Complete your risk assessment to get started.
               </p>
-            </CardContent>
-          </Card>
-        </>
-      )}
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleStartAssessment} className="w-full">
+              {healthMetrics.diabetesRisk !== null ? "Update Assessment" : "Start Assessment"}
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Recommendations</CardTitle>
+            <CardDescription>Personalized health insights</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {healthMetrics.diabetesRisk !== null && healthMetrics.recommendations?.length ? (
+              <div className="space-y-2">
+                {healthMetrics.recommendations.map((recommendation, index) => (
+                  <div key={index} className="bg-primary/10 p-3 rounded-md">
+                    <p className="text-sm text-gray-600">{recommendation}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">
+                Complete your health profile to receive personalized recommendations.
+              </p>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" onClick={handleUpdateProfile} className="w-full">Update Profile</Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 };
