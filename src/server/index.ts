@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import clientPromise from '../lib/mongodb';
+import clientPromise from './mongodb';
 
 dotenv.config();
 
@@ -21,7 +21,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/db-test', async (req, res) => {
   try {
     const client = await clientPromise;
-    const db = client.db("healthinsights");
+    const db = client.db("HealthIntelligencess");
     const collections = await db.listCollections().toArray();
     
     res.json({

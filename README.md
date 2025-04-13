@@ -1,6 +1,156 @@
 # Health Insights Navigator
 
-A comprehensive health data analysis and visualization platform.
+A comprehensive health data analysis and visualization platform that provides personalized health risk assessments, community health insights, and AI-powered health recommendations.
+
+## Features
+
+- **Individual Health Risk Assessment**
+  - AI-powered analysis using Google Gemini
+  - Personalized health recommendations
+  - Risk factor identification and scoring
+  - Predictive disease insights
+
+- **Community Health Dashboard**
+  - Interactive health data visualization
+  - Geographic health risk mapping
+  - Trend analysis and forecasting
+  - Resource optimization recommendations
+
+- **Data Analysis Tools**
+  - Excel file data extraction
+  - Health report analysis
+  - Risk factor identification
+  - Trend visualization
+
+- **Healthcare Resources**
+  - Emergency contacts
+  - Educational resources
+  - Healthcare provider finder
+  - Support services
+
+## Tech Stack
+
+- **Frontend**
+  - React with TypeScript
+  - Vite for build tooling
+  - shadcn/ui components
+  - Tailwind CSS for styling
+  - Recharts for data visualization
+  - Leaflet for mapping
+
+- **Backend**
+  - Express.js server
+  - MongoDB for data storage
+  - Google Gemini AI for health analysis
+
+- **Authentication**
+  - Clerk for user authentication
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v16+)
+- npm or yarn
+- MongoDB (local or Atlas)
+- Google Gemini API key
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/health-insights-navigator.git
+   cd health-insights-navigator
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file in the root directory:
+   ```
+   # API Configuration
+   VITE_API_BASE_URL=https://data.healthcare.gov/api/1
+   
+   # Development Mode (set to false to use real data)
+   VITE_USE_REAL_DATA=false
+   
+   # Gemini API Key (for health analysis)
+   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   
+   # MongoDB Connection
+   MONGODB_URI=mongodb://localhost:27017/HealthIntelligencess
+   ```
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Start the backend server:
+   ```bash
+   npm run server
+   ```
+
+## Project Structure
+
+```
+health-insights-navigator/
+├── src/
+│   ├── components/       # React components
+│   ├── lib/              # Utility functions and services
+│   ├── pages/            # Page components
+│   ├── server/           # Express server
+│   ├── types/            # TypeScript type definitions
+│   └── App.tsx           # Main application component
+├── public/               # Static assets
+├── .env                  # Environment variables
+├── .env.example          # Example environment variables
+├── package.json          # Project dependencies
+├── tsconfig.json         # TypeScript configuration
+└── vite.config.ts        # Vite configuration
+```
+
+## Usage
+
+1. **Health Risk Assessment**
+   - Navigate to the Risk Assessment page
+   - Enter your health information
+   - Receive AI-powered analysis and recommendations
+
+2. **Community Health Dashboard**
+   - View health data visualizations
+   - Explore geographic health risks
+   - Analyze health trends
+
+3. **Data Upload**
+   - Upload health data files
+   - Extract insights from Excel files
+   - Generate health reports
+
+4. **Resources**
+   - Access healthcare resources
+   - Find educational materials
+   - Locate healthcare providers
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Google Gemini AI for health analysis capabilities
+- Healthcare data providers
+- Open source community
 
 ## Environment Variables
 
@@ -15,6 +165,9 @@ VITE_USE_REAL_DATA=false
 
 # Gemini API Key (for health analysis)
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
+
+# MongoDB Connection
+MONGODB_URI=mongodb://localhost:27017/HealthIntelligencess
 ```
 
 ### Configuration Options
@@ -63,15 +216,6 @@ The application can work with both real and mock data:
 - React Query
 - Recharts
 - Leaflet
-
-## Features
-
-- Real-time health data visualization
-- Community health risk assessment
-- Individual health risk analysis
-- Resource optimization recommendations
-- Interactive data maps and charts
-- AI-powered health insights
 
 ## Project info
 

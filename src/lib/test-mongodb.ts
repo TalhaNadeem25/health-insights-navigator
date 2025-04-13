@@ -3,7 +3,7 @@ import clientPromise from './mongodb';
 async function testConnection() {
   try {
     const client = await clientPromise;
-    const db = client.db("healthinsights");
+    const db = client.db("HealthIntelligences");
     
     // Test the connection by listing collections
     const collections = await db.listCollections().toArray();

@@ -1,7 +1,7 @@
 {
   "name": "health-insights-backend",
   "version": "1.0.0",
-  "description": "Backend server for HealthInsights application",
+  "description": "Backend server for HealthIntelligencess application",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

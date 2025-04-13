@@ -31,7 +31,7 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-health-600 text-white font-bold">
             H+
           </div>
-          <span className="font-semibold text-lg">HealthInsights</span>
+          <span className="font-semibold text-lg">HealthIntelligences</span>
         </div>
       </div>
       <nav className="flex-1 px-4 py-6 space-y-1">
@@ -56,8 +56,8 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
       </nav>
       <div className="p-4 border-t">
         <div className="text-xs text-muted-foreground">
-          <p>HealthInsights v1.0.0</p>
-          <p>© 2025 HealthInsights</p>
+          <p>HealthIntelligencess v1.0.0</p>
+          <p>© 2025 HealthIntelligences</p>
         </div>
       </div>
     </aside>
