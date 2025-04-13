@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Brain, ArrowRight, FileText, Map, Users, Lightbulb, Calendar, ScrollText, Loader2 } from "lucide-react";
+import { Brain, ArrowRight, FileText, Map, Users, Lightbulb, Calendar, ScrollText, Loader2, AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
