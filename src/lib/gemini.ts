@@ -5,7 +5,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // In a production environment, this should be handled by a backend service
 // with proper security measures
 
-let userProvidedApiKey: string | null = null;
+// Hard-coded API key for demo purposes
+const GEMINI_API_KEY = "AIzaSyC4hmieneIcQwl6NJjoQvYoA62vPQYWoCM";
+
+let userProvidedApiKey: string | null = GEMINI_API_KEY;
 
 export const setGeminiApiKey = (apiKey: string) => {
   userProvidedApiKey = apiKey;
@@ -14,7 +17,7 @@ export const setGeminiApiKey = (apiKey: string) => {
 
 export const getGeminiApiKey = (): string | null => {
   if (userProvidedApiKey) return userProvidedApiKey;
-  return localStorage.getItem("gemini-api-key");
+  return localStorage.getItem("gemini-api-key") || GEMINI_API_KEY;
 };
 
 export const geminiAnalyzeHealth = async (
