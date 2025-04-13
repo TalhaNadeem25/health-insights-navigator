@@ -2,12 +2,12 @@ services:
   - type: web
     name: health-insights-api
     env: node
-    buildCommand: cd src/server && npm install && npm run build
-    startCommand: cd src/server && npm start
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
-      - key: VITE_MONGODB_URI
+      - key: MONGODB_URI
         sync: false # You'll need to set this manually in Render dashboard 
