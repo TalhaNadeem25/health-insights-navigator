@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Brain, Loader2 } from "lucide-react";
+import { AlertTriangle, Brain, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -13,6 +12,9 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
+import { geminiAnalyzeHealth, getGeminiApiKey, setGeminiApiKey } from "@/lib/gemini";
 
 const formSchema = z.object({
   age: z.string().min(1, {
@@ -59,6 +61,10 @@ const heartRiskFactors = [
 
 const RiskAssessment = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiKey, setApiKey] = useState(getGeminiApiKey() || "");
+  const [showApiKeyInput, setShowApiKeyInput] = useState(!getGeminiApiKey());
+  const { toast } = useToast();
+  
   const [assessmentResults, setAssessmentResults] = useState<{
     diabetesRisk: number | null;
     heartRisk: number | null;
@@ -83,19 +89,63 @@ const RiskAssessment = () => {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    setIsSubmitting(true);
-    console.log(values);
-
-    // Simulate API call to LLM model for risk assessment
-    setTimeout(() => {
-      setAssessmentResults({
-        diabetesRisk: 75,
-        heartRisk: 62,
-        llmAnalysis: "Based on the provided information, our LLM analysis indicates several significant risk factors for both diabetes and cardiovascular disease. Your BMI of 32.1 places you in the obese category, which substantially increases risk for both conditions. Your family history of diabetes is particularly concerning, as genetic factors play a strong role in Type 2 diabetes development. Your description of your diet suggests high consumption of processed foods and added sugars, which contributes to insulin resistance. Your sedentary lifestyle further compounds these risks. For heart disease, your elevated blood pressure (140/95 mmHg) is a primary concern, placing you in the hypertension category. While you've quit smoking, former smokers retain some elevated cardiovascular risk compared to never-smokers. We recommend consulting with a healthcare provider for further evaluation, particularly regarding your blood pressure and weight management. Consider a Mediterranean-style diet and gradually increasing physical activity to at least 150 minutes of moderate exercise weekly.",
+  const saveApiKey = () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter a valid Google Gemini API key",
+        variant: "destructive",
       });
+      return;
+    }
+    
+    setGeminiApiKey(apiKey);
+    setShowApiKeyInput(false);
+    toast({
+      title: "API Key Saved",
+      description: "Your Gemini API key has been saved",
+      variant: "default",
+    });
+  };
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true);
+    
+    try {
+      if (!getGeminiApiKey()) {
+        setShowApiKeyInput(true);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Use Gemini to analyze the health data
+      const result = await geminiAnalyzeHealth(values);
+      
+      if (!result.success) {
+        toast({
+          title: "Analysis Failed",
+          description: result.analysis,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      setAssessmentResults({
+        diabetesRisk: result.diabetesRisk,
+        heartRisk: result.heartRisk,
+        llmAnalysis: result.analysis,
+      });
+    } catch (error) {
+      console.error("Error during assessment:", error);
+      toast({
+        title: "Assessment Failed",
+        description: `An error occurred: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
       setIsSubmitting(false);
-    }, 3000);
+    }
   };
 
   const getImpactColor = (impact: string) => {
@@ -122,17 +172,57 @@ const RiskAssessment = () => {
       <div className="space-y-4 mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Individual Health Risk Assessment</h1>
         <p className="text-muted-foreground">
-          Complete this form to get an LLM-powered assessment of your health risks
+          Complete this form to get a Google Gemini LLM-powered assessment of your health risks
           and personalized recommendations.
         </p>
       </div>
+
+      {showApiKeyInput && (
+        <Card className="mb-8 border-t-4 border-t-amber-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Google Gemini API Key Required
+            </CardTitle>
+            <CardDescription>
+              To use the LLM-powered health assessment, please enter your Google Gemini API key.
+              This will be stored locally in your browser.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="Enter your Google Gemini API key"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="flex-1"
+              />
+              <Button onClick={saveApiKey} disabled={!apiKey.trim()}>
+                Save Key
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Don't have a key? Get one at{" "}
+              <a 
+                href="https://ai.google.dev/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                ai.google.dev
+              </a>
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {assessmentResults.diabetesRisk === null ? (
         <Card className="border-t-4 border-t-health-600">
           <CardHeader>
             <CardTitle>Health Assessment Form</CardTitle>
             <CardDescription>
-              Enter your health information below for an AI-powered risk analysis
+              Enter your health information below for a Google Gemini AI-powered risk analysis
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -369,7 +459,7 @@ const RiskAssessment = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Analyzing your data...
+                        Analyzing your data with Gemini LLM...
                       </>
                     ) : (
                       "Submit Assessment"
@@ -392,7 +482,7 @@ const RiskAssessment = () => {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Brain className="h-5 w-5 text-health-600" />
-                  <CardTitle>LLM-Powered Health Risk Analysis</CardTitle>
+                  <CardTitle>Google Gemini Powered Health Risk Analysis</CardTitle>
                 </div>
                 <CardDescription>
                   Personalized assessment based on your health information
@@ -439,12 +529,21 @@ const RiskAssessment = () => {
                 <div className="p-4 border rounded-lg">
                   <h3 className="font-medium mb-2 flex items-center gap-2">
                     <Brain className="h-4 w-4 text-health-600" />
-                    LLM Analysis
+                    Gemini LLM Analysis
                   </h3>
                   <p className="text-muted-foreground text-sm whitespace-pre-line">
                     {assessmentResults.llmAnalysis}
                   </p>
                 </div>
+
+                <Alert className="bg-muted/50 border-health-200">
+                  <Check className="h-4 w-4 text-health-600" />
+                  <AlertTitle>Powered by Google Gemini</AlertTitle>
+                  <AlertDescription>
+                    This analysis was generated by Google&apos;s Gemini large language model.
+                    Always consult healthcare professionals before making medical decisions.
+                  </AlertDescription>
+                </Alert>
 
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <h3 className="font-medium mb-2">Recommended Next Steps</h3>
@@ -456,7 +555,13 @@ const RiskAssessment = () => {
                   </ul>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="flex justify-between">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowApiKeyInput(true)}
+                >
+                  Change API Key
+                </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => setAssessmentResults({ diabetesRisk: null, heartRisk: null, llmAnalysis: null })}
