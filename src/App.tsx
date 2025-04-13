@@ -14,6 +14,7 @@ import ResourceOptimization from "./pages/ResourceOptimization";
 import ModelDeployment from "./pages/ModelDeployment";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import KnowledgeBase from "./pages/KnowledgeBase";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -43,6 +44,7 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/knowledge-base" element={<KnowledgeBase />} />
               <Route path="/risk-assessment" element={
                 <ProtectedRoute>
                   <RiskAssessment />

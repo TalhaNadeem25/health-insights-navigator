@@ -9,6 +9,7 @@ import { Bot, Send, User, AlertTriangle, ArrowUp, Loader2, Brain } from "lucide-
 import { cn } from '@/lib/utils';
 import { useToast } from './ui/use-toast';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ClientSideVectorStore } from '@/lib/vectorStorage';
 
 interface Message {
   id: string;
@@ -132,6 +133,7 @@ export function HealthReportAnalyzer() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [apiKeySet, setApiKeySet] = useState<boolean>(false);
+  const [vectorStore] = useState<ClientSideVectorStore>(() => new ClientSideVectorStore());
 
   // Check if API key is available
   useEffect(() => {
@@ -210,9 +212,31 @@ export function HealthReportAnalyzer() {
     setIsTyping(true);
     
     try {
-      // Generate response with Gemini API
+      // Find relevant knowledge base entries
+      let additionalContext = '';
+      
+      try {
+        // Only add this if the vector store has documents
+        const documents = vectorStore.getAllDocuments();
+        if (documents.length > 0) {
+          const relevantDocs = await vectorStore.search(healthReport, 2);
+          
+          if (relevantDocs.length > 0) {
+            additionalContext = '\n\nRelevant health knowledge from your knowledge base:\n';
+            relevantDocs.forEach((doc, index) => {
+              const metadata = doc.metadata as any;
+              additionalContext += `\n${index + 1}. ${metadata?.title || 'Health Information'}: ${doc.content}\n`;
+            });
+          }
+        }
+      } catch (error) {
+        console.log('No knowledge base entries found or error searching:', error);
+        // Continue without knowledge base context if there's an error
+      }
+      
+      // Generate response with Gemini API including knowledge base entries
       const { response, insights: newInsights } = await generateGeminiResponse(
-        healthReport, 
+        healthReport + additionalContext, 
         conversationContext
       );
       
