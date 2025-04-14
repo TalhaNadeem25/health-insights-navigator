@@ -28,9 +28,7 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
     >
       <div className="hidden md:flex h-16 items-center px-4 border-b">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-health-600 text-white font-bold">
-            H+
-          </div>
+          <img src="/logo.svg" alt="Health Intelligences Logo" className="w-8 h-8" />
           <span className="font-semibold text-lg">HealthIntelligences</span>
         </div>
       </div>

@@ -27,38 +27,10 @@ function App() {
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-4">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <SignedIn>
-                    <Dashboard />
-                  </SignedIn>
-                }
-              />
-              <Route
-                path="/risk-assessment"
-                element={
-                  <SignedIn>
-                    <RiskAssessment />
-                  </SignedIn>
-                }
-              />
-              <Route
-                path="/resource-optimization"
-                element={
-                  <SignedIn>
-                    <ResourceOptimization />
-                  </SignedIn>
-                }
-              />
-              <Route
-                path="/data-upload"
-                element={
-                  <SignedIn>
-                    <DataUpload />
-                  </SignedIn>
-                }
-              />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/risk-assessment" element={<RiskAssessment />} />
+              <Route path="/resource-optimization" element={<ResourceOptimization />} />
+              <Route path="/data-upload" element={<DataUpload />} />
               <Route
                 path="/sign-in"
                 element={

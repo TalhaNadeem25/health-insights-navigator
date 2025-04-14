@@ -44,9 +44,6 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
           )}
           {isSignedIn && (
             <>
-              <Button variant="ghost" asChild>
-                <Link to="/dashboard">Dashboard</Link>
-              </Button>
               <Button 
                 variant="ghost" 
                 onClick={() => signOut()}
